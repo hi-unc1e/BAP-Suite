@@ -142,9 +142,8 @@ class Brute:
         pool = Pool(self.threadNum)
         jobs = []
         for auth in self.yieldAuth():
-            for i in range(threadNum):
-                jobs.append(pool.spawn(self.req, auth))
-            gevent.joinall(jobs)
+            jobs.append(pool.spawn(self.req, auth))
+        gevent.joinall(jobs)
         # jobs = [pool.spawn(self.req, auth) for auth in self.yieldAuth()]
         # gevent.joinall(jobs)
         print("Done, if there is no results, then Brute Force regarded failed")
