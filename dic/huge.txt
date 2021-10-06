@@ -1,0 +1,6 @@
+root
+admin
+system
+123456
+manager
+guest
