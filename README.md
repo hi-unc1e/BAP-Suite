@@ -14,6 +14,10 @@ HTTP Basic Auth brute-force Suite
 - ommited
 
 
+Usage:
+<img width="1064" alt="image" src="https://user-images.githubusercontent.com/67778054/164774911-5953e688-163b-4e0f-8e0b-91f89d60690e.png">
+
+
 ---------
 ## Progress List
 CLI
