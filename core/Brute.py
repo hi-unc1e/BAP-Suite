@@ -36,6 +36,12 @@ logging.basicConfig(level=logging.INFO,
 info_white = lambda x:f"{Fore.WHITE}{x}{Style.RESET_ALL}"
 info_green = lambda x:f"{Fore.GREEN}{x}{Style.RESET_ALL}"
 
+
+def get_auth_by_usr_pwd(url, u, p):
+
+    HTTPBasicAuth
+
+
 def loadDic():
     '''
     加载账号密码字典,并返回两个列表
@@ -80,6 +86,7 @@ class Brute:
         # eg：
         #   401
         self.base_status_code = self.getBaseCode()
+        self.authMode = self.getAuthMode()
         self.userList, self.pwdList = loadDic()
 
 
@@ -90,6 +97,7 @@ class Brute:
         try:
             resp = requests.get(self.url, timeout=self.timeout, verify=self.SSL_veirfy)
                     # 预检查，页面状态码是否为401
+
             code = resp.status_code
             if False == code:
                 logging.error(f"Error in status_code({code})")
@@ -167,6 +175,9 @@ class Brute:
             logging.info(f"[+]Great! cred for {Fore.GREEN}{self.url}{Style.RESET_ALL} is: {Fore.GREEN}%s{Style.RESET_ALL}" % self.realPwd)
         else:
             logging.info("Done, if there is no results, then Brute Force regarded failed")
+
+    def getAuthMode(self):
+        pass
 
 
 if __name__ == "__main__":
